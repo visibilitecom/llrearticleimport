@@ -1,4 +1,3 @@
-
 import os
 import requests
 import pandas as pd
@@ -13,6 +12,7 @@ load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 LARAVEL_API = os.getenv("LARAVEL_API")
 
+# Mapping nom de catégorie → ID Laravel
 def categorie_to_id(name: str) -> int:
     mapping = {
         "Communication": 1,
@@ -24,8 +24,9 @@ def categorie_to_id(name: str) -> int:
         "Sport": 7,
         "Traduire": 9
     }
-    return mapping.get(name.strip(), 2)
+    return mapping.get(name.strip(), 2)  # valeur par défaut : 2
 
+# Génération de l'article long
 def generate_article(keyword):
     print(f"🧠 Génération article long SEO : {keyword}")
     prompt = f"""
@@ -47,10 +48,11 @@ Thème : {keyword}
 
     content = response.choices[0].message.content
     lines = content.strip().split("\n")
-    title = lines[0]
-    body = "\n".join(lines[1:])
-    return title.strip(), body.strip()
+    title = lines[0].strip("# ").strip()
+    body = "\n".join(lines[1:]).strip()
+    return title, body
 
+# Génération de l’image
 def generate_image(prompt, filename):
     print(f"🖼️ Génération image : {filename}")
     response = client.images.generate(
@@ -69,6 +71,7 @@ def generate_image(prompt, filename):
         f.write(img_bytes)
     return filepath
 
+# Envoi des données à Laravel
 def send_to_laravel(title, content, keyword, category_id, cover_path, thumb_path):
     print(f"📤 Envoi à Laravel : {title}")
     try:
@@ -83,29 +86,37 @@ def send_to_laravel(title, content, keyword, category_id, cover_path, thumb_path
                 "keywords": keyword,
                 "category_id": category_id
             }
+
             response = requests.post(LARAVEL_API, files=files, data=data)
             print(f"✅ Statut HTTP Laravel : {response.status_code}")
-            try:
-                print(response.json())
-            except Exception:
-                print("❌ Réponse brute Laravel :")
-                print(response.text)
-    except Exception as e:
-        print("⚠️ Erreur lors de l'envoi à Laravel :", str(e))
 
+            # Vérification type de réponse
+            content_type = response.headers.get("Content-Type", "")
+            if "application/json" in content_type:
+                print("✅ Réponse JSON Laravel :", response.json())
+            else:
+                print("⚠️ Réponse Laravel non-JSON (HTML probablement) :")
+                print(response.text[:1000])
+
+    except Exception as e:
+        print("❌ Erreur d'envoi à Laravel :", str(e))
+
+# Fonction principale
 def main():
     df = pd.read_excel("keywords.xlsx")
-    for _, row in df.head(10).iterrows():  # Limite à 10 articles par jour
+
+    for _, row in df.head(10).iterrows():  # max 10 articles/jour
         keyword = row["mot_cle"]
         category = row["catégorie"]
         category_id = categorie_to_id(category)
 
         title, content = generate_article(keyword)
-        slug = keyword.replace(" ", "_").lower()
+        slug = keyword.lower().replace(" ", "_")
         cover_img = generate_image(f"Image réaliste pour : {keyword}", f"{slug}_cover.jpg")
         thumb_img = generate_image(f"Miniature réaliste pour : {keyword}", f"{slug}_thumb.jpg")
 
         send_to_laravel(title, content, keyword, category_id, cover_img, thumb_img)
 
+# Lancer le script
 if __name__ == "__main__":
     main()
