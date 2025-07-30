@@ -1,14 +1,15 @@
-
 import os
-import openai
 import requests
 import pandas as pd
 from dotenv import load_dotenv
 from pathlib import Path
+from openai import OpenAI
 
+# Charger les variables d'environnement
 load_dotenv()
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+# Initialiser OpenAI client
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 LARAVEL_API = os.getenv("LARAVEL_API")
 
 def categorie_to_id(name: str) -> int:
@@ -33,7 +34,8 @@ avec des titres H2 et H3 optimisés pour le référencement naturel. L’article
 et des expressions sémantiques pertinentes autour du sujet. Évite les introductions robotiques.
 Thème : {keyword}
 """
-    response = openai.ChatCompletion.create(
+
+    response = client.chat.completions.create(
         model="gpt-4",
         messages=[
             {"role": "system", "content": "Tu es un expert en rédaction humaine optimisée pour le SEO naturel."},
@@ -41,7 +43,8 @@ Thème : {keyword}
         ],
         temperature=0.6
     )
-    content = response["choices"][0]["message"]["content"]
+
+    content = response.choices[0].message.content
     lines = content.strip().split("\n")
     title = lines[0]
     body = "\n".join(lines[1:])
@@ -49,14 +52,14 @@ Thème : {keyword}
 
 def generate_image(prompt, filename):
     print(f"🖼️ Génération image : {filename}")
-    img = openai.Image.create(
-        prompt=prompt,
+    response = client.images.generate(
         model="dall-e-3",
+        prompt=prompt,
         n=1,
-        size="1024x1024",
-        response_format="url"
+        size="1024x1024"
     )
-    url = img["data"][0]["url"]
+
+    url = response.data[0].url
     img_bytes = requests.get(url).content
 
     Path("images").mkdir(exist_ok=True)
