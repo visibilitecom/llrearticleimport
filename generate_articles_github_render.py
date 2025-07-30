@@ -1,19 +1,17 @@
 import os
+import re
 import requests
 import pandas as pd
 from dotenv import load_dotenv
 from pathlib import Path
 from openai import OpenAI
-import re
 
-# Charger les variables d'environnement
+# Chargement des variables d’environnement
 load_dotenv()
-
-# Initialiser OpenAI client
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 LARAVEL_API = os.getenv("LARAVEL_API")
 
-# Mapping nom de catégorie → ID Laravel
+# 🗂️ Mapping des catégories vers leur ID Laravel
 def categorie_to_id(name: str) -> int:
     mapping = {
         "Communication": 1,
@@ -27,7 +25,7 @@ def categorie_to_id(name: str) -> int:
     }
     return mapping.get(name.strip(), 2)
 
-# Génération de l'article long
+# 🧠 Génère un article optimisé SEO
 def generate_article(keyword):
     print(f"🧠 Génération article long SEO : {keyword}")
     prompt = f"""
@@ -51,7 +49,7 @@ Thème : {keyword}
     body = "\n".join(lines[1:]).strip()
     return title, body
 
-# Génération de l’image
+# 🖼️ Génère une image via DALL·E 3
 def generate_image(prompt, filename):
     print(f"🖼️ Génération image : {filename}")
     response = client.images.generate(
@@ -68,7 +66,7 @@ def generate_image(prompt, filename):
         f.write(img_bytes)
     return filepath
 
-# Envoi à Laravel
+# 📤 Envoie à Laravel via API
 def send_to_laravel(title, content, keyword, category_id, cover_path, thumb_path):
     print(f"📤 Envoi à Laravel : {title}")
     try:
@@ -80,7 +78,7 @@ def send_to_laravel(title, content, keyword, category_id, cover_path, thumb_path
             data = {
                 "title": title,
                 "content": content,
-                "key_words": keyword,  # clé corrigée
+                "key_words": keyword,
                 "category_id": category_id
             }
             headers = {
@@ -96,13 +94,16 @@ def send_to_laravel(title, content, keyword, category_id, cover_path, thumb_path
             else:
                 print("⚠️ Réponse Laravel non-JSON :")
                 print(response.text[:1000])
-
     except Exception as e:
         print("❌ Erreur d'envoi à Laravel :", str(e))
 
-# Fonction principale
+# ▶️ Lancement du script
 def main():
-    df = pd.read_excel("keywords.xlsx")
+    try:
+        df = pd.read_excel("keywords.xlsx")
+    except Exception as e:
+        print("❌ Fichier keywords.xlsx introuvable ou illisible :", e)
+        return
 
     for _, row in df.head(10).iterrows():
         keyword = str(row.get("mot_cle", "")).strip()
@@ -121,6 +122,5 @@ def main():
 
         send_to_laravel(title, content, keyword, category_id, cover_img, thumb_img)
 
-# Lancer le script
 if __name__ == "__main__":
     main()
