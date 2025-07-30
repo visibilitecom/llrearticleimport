@@ -4,6 +4,7 @@ import pandas as pd
 from dotenv import load_dotenv
 from pathlib import Path
 from openai import OpenAI
+import re
 
 # Charger les variables d'environnement
 load_dotenv()
@@ -24,7 +25,7 @@ def categorie_to_id(name: str) -> int:
         "Sport": 7,
         "Traduire": 9
     }
-    return mapping.get(name.strip(), 2)  # valeur par défaut : 2
+    return mapping.get(name.strip(), 2)
 
 # Génération de l'article long
 def generate_article(keyword):
@@ -50,7 +51,7 @@ Thème : {keyword}
     body = "\n".join(lines[1:]).strip()
     return title, body
 
-# Génération de l’image avec DALL·E
+# Génération de l’image
 def generate_image(prompt, filename):
     print(f"🖼️ Génération image : {filename}")
     response = client.images.generate(
@@ -67,7 +68,7 @@ def generate_image(prompt, filename):
         f.write(img_bytes)
     return filepath
 
-# Envoi des données à Laravel avec en-tête JSON
+# Envoi à Laravel
 def send_to_laravel(title, content, keyword, category_id, cover_path, thumb_path):
     print(f"📤 Envoi à Laravel : {title}")
     try:
@@ -79,7 +80,7 @@ def send_to_laravel(title, content, keyword, category_id, cover_path, thumb_path
             data = {
                 "title": title,
                 "content": content,
-                "keywords": keyword,
+                "key_words": keyword,  # clé corrigée
                 "category_id": category_id
             }
             headers = {
@@ -93,7 +94,7 @@ def send_to_laravel(title, content, keyword, category_id, cover_path, thumb_path
             if "application/json" in content_type:
                 print("✅ Réponse JSON Laravel :", response.json())
             else:
-                print("⚠️ Réponse Laravel non-JSON (HTML probablement) :")
+                print("⚠️ Réponse Laravel non-JSON :")
                 print(response.text[:1000])
 
     except Exception as e:
@@ -103,13 +104,18 @@ def send_to_laravel(title, content, keyword, category_id, cover_path, thumb_path
 def main():
     df = pd.read_excel("keywords.xlsx")
 
-    for _, row in df.head(10).iterrows():  # Génère max 10 articles
-        keyword = row["mot_cle"]
-        category = row["catégorie"]
+    for _, row in df.head(10).iterrows():
+        keyword = str(row.get("mot_cle", "")).strip()
+        category = str(row.get("catégorie", "")).strip()
+
+        if not keyword or not category:
+            print("⚠️ Mot-clé ou catégorie manquant. Article ignoré.")
+            continue
+
         category_id = categorie_to_id(category)
 
         title, content = generate_article(keyword)
-        slug = keyword.lower().replace(" ", "_")
+        slug = re.sub(r'\W+', '_', keyword.lower())
         cover_img = generate_image(f"Image réaliste pour : {keyword}", f"{slug}_cover.jpg")
         thumb_img = generate_image(f"Miniature réaliste pour : {keyword}", f"{slug}_thumb.jpg")
 
