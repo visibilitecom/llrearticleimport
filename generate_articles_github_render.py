@@ -25,18 +25,26 @@ def categorie_to_id(name: str) -> int:
     return mapping.get(name.strip(), 2)
 
 def generate_article(keyword):
-    print(f"🧠 Génération article : {keyword}")
+    print(f"🧠 Génération article long SEO : {keyword}")
+    prompt = f"""
+Tu es un rédacteur web expert en SEO et UX. Rédige un article de blog de plus de 1000 mots, structuré pour le web, 
+avec des titres H2 et H3 optimisés pour le référencement naturel. L’article doit être naturel, informatif, engageant 
+(et ne jamais sembler écrit par une IA). Ajoute des paragraphes courts, des mots de transition, des titres attrayants 
+et des expressions sémantiques pertinentes autour du sujet. Évite les introductions robotiques.
+Thème : {keyword}
+"""
     response = openai.ChatCompletion.create(
         model="gpt-4",
         messages=[
-            {"role": "system", "content": "Tu es un expert en rédaction SEO."},
-            {"role": "user", "content": f"Rédige un article de 300 mots optimisé SEO sur : {keyword}"}
+            {"role": "system", "content": "Tu es un expert en rédaction humaine optimisée pour le SEO naturel."},
+            {"role": "user", "content": prompt}
         ],
-        temperature=0.7
+        temperature=0.6
     )
     content = response["choices"][0]["message"]["content"]
-    title = content.split("\n")[0]
-    body = "\n".join(content.split("\n")[1:])
+    lines = content.strip().split("\n")
+    title = lines[0]
+    body = "\n".join(lines[1:])
     return title.strip(), body.strip()
 
 def generate_image(prompt, filename):
