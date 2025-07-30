@@ -1,3 +1,4 @@
+
 import os
 import requests
 import pandas as pd
@@ -70,25 +71,27 @@ def generate_image(prompt, filename):
 
 def send_to_laravel(title, content, keyword, category_id, cover_path, thumb_path):
     print(f"📤 Envoi à Laravel : {title}")
-with open(cover_path, "rb") as cover_file, open(thumb_path, "rb") as thumb_file:
-    files = {
-        "cover_image": cover_file,
-        "thumbnail_image": thumb_file
-    }
-    data = {
-        "title": title,
-        "content": content,
-        "keywords": keyword,
-        "category_id": category_id
-    }
-    response = requests.post(LARAVEL_API, files=files, data=data)
-    
-    print(f"✅ Statut HTTP Laravel : {response.status_code}")
     try:
-        print(response.json())
-    except Exception:
-        print("❌ Réponse brute Laravel :")
-        print(response.text)
+        with open(cover_path, "rb") as cover_file, open(thumb_path, "rb") as thumb_file:
+            files = {
+                "cover_image": cover_file,
+                "thumbnail_image": thumb_file
+            }
+            data = {
+                "title": title,
+                "content": content,
+                "keywords": keyword,
+                "category_id": category_id
+            }
+            response = requests.post(LARAVEL_API, files=files, data=data)
+            print(f"✅ Statut HTTP Laravel : {response.status_code}")
+            try:
+                print(response.json())
+            except Exception:
+                print("❌ Réponse brute Laravel :")
+                print(response.text)
+    except Exception as e:
+        print("⚠️ Erreur lors de l'envoi à Laravel :", str(e))
 
 def main():
     df = pd.read_excel("keywords.xlsx")
