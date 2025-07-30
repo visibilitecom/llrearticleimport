@@ -82,8 +82,8 @@ def send_to_laravel(title, content, keyword, category_id, cover_path, thumb_path
             "category_id": category_id
         }
         response = requests.post(LARAVEL_API, files=files, data=data)
-        print(f"✅ Statut : {response.status_code}")
-        print(response.json())
+        print(f"❌ Erreur Laravel - Statut : {response.status_code}")
+print("Réponse brute :", response.text)
 
 def main():
     df = pd.read_excel("keywords.xlsx")
