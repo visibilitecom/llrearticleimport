@@ -36,7 +36,6 @@ avec des titres H2 et H3 optimisés pour le référencement naturel. L’article
 et des expressions sémantiques pertinentes autour du sujet. Évite les introductions robotiques.
 Thème : {keyword}
 """
-
     response = client.chat.completions.create(
         model="gpt-4",
         messages=[
@@ -45,14 +44,13 @@ Thème : {keyword}
         ],
         temperature=0.6
     )
-
     content = response.choices[0].message.content
     lines = content.strip().split("\n")
     title = lines[0].strip("# ").strip()
     body = "\n".join(lines[1:]).strip()
     return title, body
 
-# Génération de l’image
+# Génération de l’image avec DALL·E
 def generate_image(prompt, filename):
     print(f"🖼️ Génération image : {filename}")
     response = client.images.generate(
@@ -61,17 +59,15 @@ def generate_image(prompt, filename):
         n=1,
         size="1024x1024"
     )
-
     url = response.data[0].url
     img_bytes = requests.get(url).content
-
     Path("images").mkdir(exist_ok=True)
     filepath = f"images/{filename}"
     with open(filepath, "wb") as f:
         f.write(img_bytes)
     return filepath
 
-# Envoi des données à Laravel
+# Envoi des données à Laravel avec en-tête JSON
 def send_to_laravel(title, content, keyword, category_id, cover_path, thumb_path):
     print(f"📤 Envoi à Laravel : {title}")
     try:
@@ -86,11 +82,13 @@ def send_to_laravel(title, content, keyword, category_id, cover_path, thumb_path
                 "keywords": keyword,
                 "category_id": category_id
             }
+            headers = {
+                "Accept": "application/json"
+            }
 
-            response = requests.post(LARAVEL_API, files=files, data=data)
+            response = requests.post(LARAVEL_API, files=files, data=data, headers=headers)
             print(f"✅ Statut HTTP Laravel : {response.status_code}")
 
-            # Vérification type de réponse
             content_type = response.headers.get("Content-Type", "")
             if "application/json" in content_type:
                 print("✅ Réponse JSON Laravel :", response.json())
@@ -105,7 +103,7 @@ def send_to_laravel(title, content, keyword, category_id, cover_path, thumb_path
 def main():
     df = pd.read_excel("keywords.xlsx")
 
-    for _, row in df.head(10).iterrows():  # max 10 articles/jour
+    for _, row in df.head(10).iterrows():  # Génère max 10 articles
         keyword = row["mot_cle"]
         category = row["catégorie"]
         category_id = categorie_to_id(category)
