@@ -156,13 +156,11 @@ def main():
             df.at[idx, 'envoye'] = 1
             df.at[idx, 'post_id'] = post_id
             print("✅ Article publié.")
-")
         else:
             backup_path = f"article_backup_{keyword.replace(' ', '_')}.html"
             with open(backup_path, "w", encoding="utf-8") as f:
                 f.write(content)
-            print(f"💾 Article sauvegardé localement dans {backup_path}
-")
+            print(f"💾 Article sauvegardé localement dans {backup_path}")
 
     try:
         df.to_excel("keywords.xlsx", index=False, engine='openpyxl')
