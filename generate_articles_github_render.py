@@ -7,26 +7,25 @@ import subprocess
 import requests
 import pandas as pd
 from dotenv import load_dotenv
-from bs4 import BeautifulSoup
-import markdown
-from openai import OpenAI
 
-# 📦 Vérifie et installe les modules nécessaires
-required = ['openai', 'markdown', 'bs4', 'openpyxl', 'flask', 'python-dotenv']
+# 📦 Installation conditionnelle
+required = ['openai', 'markdown', 'bs4', 'openpyxl']
 for pkg in required:
     try:
         __import__(pkg)
     except ImportError:
         subprocess.check_call([sys.executable, "-m", "pip", "install", pkg])
 
-# 🔐 Chargement des variables
-df_path = "keywords.xlsx"
+import markdown
+from bs4 import BeautifulSoup
+from openai import OpenAI
+
+# 🔐 Config
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 LARAVEL_API = os.getenv("LARAVEL_API")
 IMAGE_PATH = "storage/photos/1/Google I/Google IO 2025.png"
 
-# 🧠 Génération d'article long et SEO
 def generate_article(keyword):
     print(f"🧠 Génération de contenu pour : {keyword}")
     prompt = f"""Tu es un rédacteur web senior, expert en SEO et UX, spécialisé dans la rédaction d’articles optimisés pour Google et agréables à lire.
@@ -40,9 +39,9 @@ Ta mission : rédiger un article HTML de **plus de 1000 mots** (au moins 6000 ca
     - Doit inciter au clic (ex. : “Comment…”, “Top 10…”, “Pourquoi…”)
 - Ajoute une **balise meta-description HTML** (<160 caractères) contenant le mot-clé principal
 - Structure l’article avec **au moins 7 sections H2** :
-  <h2 class=\"section__title\"><em>...</em></h2>
+  <h2 class="section__title"><em>...</em></h2>
 - Ajoute des sous-sections H3 si nécessaire :
-  <h3 class=\"section__title\"><em>...</em></h3>
+  <h3 class="section__title"><em>...</em></h3>
 - Utilise des listes <ul><li>...</li></ul> si pertinent
 - Utilise des paragraphes courts (<p>) optimisés pour la lecture web
 
@@ -64,46 +63,36 @@ Ta mission : rédiger un article HTML de **plus de 1000 mots** (au moins 6000 ca
 
 - Écris pour une intention de recherche **informationnelle**
 - Ne crée pas de tableau HTML
-- Génère uniquement le contenu HTML (pas de <html>, <head>, <body>)"""
+- Génére uniquement le contenu HTML (pas de <html>, <head>, <body>)"""
     try:
         response = client.chat.completions.create(
             model="gpt-4",
             messages=[
-                {"role": "system", "content": "Tu écris comme un rédacteur humain SEO confirmé."},
+                {"role": "system", "content": "Tu écris du contenu SEO comme un humain."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.7,
-            max_tokens=2500
+            temperature=0.8
         )
         html = response.choices[0].message.content
         title = extract_title_from_html(html)
         clean_html = sanitize_html(html)
+        print(f"✅ Article généré pour '{keyword}' — Titre : {title}")
         return title, clean_html
     except Exception as e:
-        print(f"❌ Erreur GPT : {e}")
+        print(f"❌ Erreur lors de la génération avec OpenAI : {e}")
         return None, None
 
-# 🔎 Extraction du premier H2
 def extract_title_from_html(html):
     soup = BeautifulSoup(html, 'html.parser')
     h2 = soup.find('h2')
     return h2.get_text(strip=True) if h2 else "Article sans titre"
 
-# 🧼 Nettoyage HTML
 def sanitize_html(html):
     soup = BeautifulSoup(html, 'html.parser')
-    for tag in soup.find_all(['h2', 'h3']):
-        tag['class'] = 'section__title'
-        text = tag.get_text(strip=True)
-        tag.clear()
-        em = soup.new_tag("em")
-        em.string = text
-        tag.append(em)
     return str(soup)
 
-# 📄 Envoi Laravel
 def send_to_laravel(title, content, keyword):
-    print(f"📄 Envoi à Laravel : {title}")
+    print(f"📤 Envoi vers Laravel pour : {keyword}")
     try:
         data = {
             "title": title,
@@ -120,19 +109,21 @@ def send_to_laravel(title, content, keyword):
         response = requests.post(LARAVEL_API, data=data, headers=headers, timeout=30)
         response.raise_for_status()
         if "application/json" in response.headers.get("Content-Type", ""):
+            print("✅ Article envoyé à Laravel avec succès.")
             return True, response.json().get("post_id")
         print("⚠️ Réponse non-JSON :", response.text[:500])
         return False, None
     except Exception as e:
-        print("❌ Erreur envoi Laravel :", str(e))
+        print(f"❌ Erreur lors de l’envoi à Laravel : {e}")
         return False, None
 
-# ▶️ Script principal
 def main():
+    print("🚀 Script de génération d’articles lancé.")
     try:
-        df = pd.read_excel(df_path, engine='openpyxl')
+        df = pd.read_excel("keywords.xlsx", engine='openpyxl')
+        print("📖 Fichier Excel chargé.")
     except Exception as e:
-        print("❌ Erreur lecture Excel :", e)
+        print(f"❌ Erreur lecture Excel : {e}")
         return
 
     if 'envoye' not in df.columns:
@@ -142,35 +133,34 @@ def main():
 
     for idx, row in df.iterrows():
         if row.get("envoye", 0) == 1:
+            print(f"⏩ Mot-clé déjà traité : {row.get('mot_cle')}")
             continue
 
         keyword = str(row.get("mot_cle", "")).strip()
         if not keyword:
+            print("⚠️ Mot-clé vide, ligne ignorée.")
             continue
 
         title, content = generate_article(keyword)
-        if not title or not content or len(content) < 6000:
-            print(f"⚠️ Contenu insuffisant pour : {keyword} ({len(content) if content else 0} caractères)")
+        if not title or not content or len(content) < 2000:
+            print(f"⚠️ Article trop court ou invalide pour : {keyword}")
             continue
 
         success, post_id = send_to_laravel(title, content, keyword)
         if success:
             df.at[idx, 'envoye'] = 1
             df.at[idx, 'post_id'] = post_id
-            print("✅ Article publié.")
+            print("✅ Article publié et sauvegardé.")
         else:
-            backup_path = f"article_backup_{keyword.replace(' ', '_')}.html"
-            with open(backup_path, "w", encoding="utf-8") as f:
-                f.write(content)
-            print(f"💾 Article sauvegardé localement dans {backup_path}")
+            print("⚠️ Échec de publication Laravel.")
 
     try:
-        df.to_excel(df_path, index=False, engine='openpyxl')
-        print("💾 Fichier Excel mis à jour.")
+        df.to_excel("keywords.xlsx", index=False, engine='openpyxl')
+        print("💾 Fichier Excel mis à jour avec les statuts.")
     except Exception as e:
-        print("❌ Erreur sauvegarde Excel :", e)
+        print(f"❌ Erreur lors de l’écriture du fichier Excel : {e}")
 
-    print("✅ Script terminé avec succès.")
+    print("🏁 Fin du script.")
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
