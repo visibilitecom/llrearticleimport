@@ -1,3 +1,4 @@
+
 import os
 import re
 import sys
@@ -6,7 +7,7 @@ import requests
 import pandas as pd
 from dotenv import load_dotenv
 
-# 📦 Installation conditionnelle
+# 📦 Vérifie et installe les modules nécessaires
 required = ['openai', 'markdown', 'bs4', 'openpyxl']
 for pkg in required:
     try:
@@ -18,33 +19,60 @@ import markdown
 from bs4 import BeautifulSoup
 from openai import OpenAI
 
-# 🔐 Config
+# 🔐 Chargement des variables
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 LARAVEL_API = os.getenv("LARAVEL_API")
 IMAGE_PATH = "storage/photos/1/Google I/Google IO 2025.png"
 
+# 🧠 Génération d'article long et SEO
 def generate_article(keyword):
     print(f"🧠 Génération de contenu : {keyword}")
-    prompt = f"""
-Tu es un rédacteur web expert en SEO. Rédige un article de blog de plus de 1000 mots, structuré pour le web.
-Utilise les balises HTML suivantes :
-- <h2 class="section__title"><em>...</em></h2>
-- <h3 class="section__title"><em>...</em></h3>
-- <ul><li>...</li></ul>
-- <p>...</p>
-Pas de section “Introduction”, pas de mention d'IA.
+    prompt = f"""Tu es un rédacteur web senior, expert en SEO et UX, spécialisé dans la rédaction d’articles optimisés pour Google et agréables à lire.
 
-Sujet : {keyword}
-"""
+Ta mission : rédiger un article HTML de **plus de 1000 mots** (au moins 6000 caractères), sur le sujet suivant : **{keyword}**.
+
+### Structure attendue :
+- Commence par un **titre principal SEO** (servira de <title> mais ne doit pas être une balise <h1>)
+    - Doit inclure le mot-clé principal
+    - Ne doit pas dépasser 65 caractères
+    - Doit inciter au clic (ex. : “Comment…”, “Top 10…”, “Pourquoi…”)
+- Ajoute une **balise meta-description HTML** (<160 caractères) contenant le mot-clé principal
+- Structure l’article avec **au moins 7 sections H2** :
+  <h2 class="section__title"><em>...</em></h2>
+- Ajoute des sous-sections H3 si nécessaire :
+  <h3 class="section__title"><em>...</em></h3>
+- Utilise des listes <ul><li>...</li></ul> si pertinent
+- Utilise des paragraphes courts (<p>) optimisés pour la lecture web
+
+### Contraintes SEO :
+- Le mot-clé principal doit apparaître :
+  - dans au moins un <h2>
+  - dans deux paragraphes
+  - dans une liste <ul>
+  - dans la meta-description
+- Évite toute suroptimisation : densité naturelle (~1% à 2%)
+- Intègre des variantes sémantiques et expressions longue traîne
+- N’utilise pas de titres "Introduction" ou "Conclusion"
+- Ne commence pas par "Dans cet article…"
+- Ne dis jamais que tu es une IA
+- Rédige dans un style fluide, humain et informatif
+- Adopte un **ton à la fois persuasif et technique** : démontre l’expertise sur le sujet tout en incitant à lire, à s’informer ou à agir.
+- Utilise un vocabulaire professionnel, précis et argumenté.
+- Mets en avant des bénéfices concrets ou des points différenciateurs pour convaincre l’internaute.
+
+- Écris pour une intention de recherche **informationnelle**
+- Ne crée pas de tableau HTML
+- Génére uniquement le contenu HTML (pas de <html>, <head>, <body>)"""
     try:
         response = client.chat.completions.create(
             model="gpt-4",
             messages=[
-                {"role": "system", "content": "Tu écris du contenu SEO comme un humain."},
+                {"role": "system", "content": "Tu écris comme un rédacteur humain SEO confirmé."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.6
+            temperature=0.7,
+            max_tokens=2500
         )
         html = response.choices[0].message.content
         title = extract_title_from_html(html)
@@ -54,15 +82,25 @@ Sujet : {keyword}
         print(f"❌ Erreur GPT : {e}")
         return None, None
 
+# 🔎 Extraction du premier H2 pour titre
 def extract_title_from_html(html):
     soup = BeautifulSoup(html, 'html.parser')
     h2 = soup.find('h2')
     return h2.get_text(strip=True) if h2 else "Article sans titre"
 
+# 🧼 Nettoyage HTML (compatible Laravel/Tiny)
 def sanitize_html(html):
     soup = BeautifulSoup(html, 'html.parser')
+    for tag in soup.find_all(['h2', 'h3']):
+        tag['class'] = 'section__title'
+        text = tag.get_text(strip=True)
+        tag.clear()
+        em = soup.new_tag("em")
+        em.string = text
+        tag.append(em)
     return str(soup)
 
+# 📤 Envoi à Laravel
 def send_to_laravel(title, content, keyword):
     print(f"📤 Envoi à Laravel : {title}")
     try:
@@ -88,6 +126,7 @@ def send_to_laravel(title, content, keyword):
         print("❌ Erreur envoi Laravel :", str(e))
         return False, None
 
+# ▶️ Script principal
 def main():
     try:
         df = pd.read_excel("keywords.xlsx", engine='openpyxl')
