@@ -1,29 +1,24 @@
 import os
 import re
+import subprocess
+import sys
 import requests
 import pandas as pd
 from dotenv import load_dotenv
-from pathlib import Path
 from openai import OpenAI
 
-# Chargement des variables d’environnement
+# 📦 Vérifie et installe openpyxl
+try:
+    import openpyxl
+except ImportError:
+    print("📦 Installation de openpyxl...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "openpyxl"])
+    import openpyxl
+
+# 🔐 Chargement des variables d’environnement
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-LARAVEL_API = os.getenv("LARAVEL_API")
-
-# 🗂️ Mapping des catégories vers leur ID Laravel
-def categorie_to_id(name: str) -> int:
-    mapping = {
-        "Communication": 1,
-        "Rédacteur": 2,
-        "Politique": 3,
-        "Immobilier": 4,
-        "Rédacteur Santé": 5,
-        "Cinema": 6,
-        "Sport": 7,
-        "Traduire": 9
-    }
-    return mapping.get(name.strip(), 2)
+LARAVEL_API = os.getenv("LARAVEL_API")  # ex : https://llredac.fr/api/generate-articles
 
 # 🧠 Génère un article optimisé SEO
 def generate_article(keyword):
@@ -50,106 +45,89 @@ Thème : {keyword}
         body = "\n".join(lines[1:]).strip()
         return title, body
     except Exception as e:
-        print(f"❌ Erreur lors de la génération de l'article : {e}")
+        print(f"❌ Erreur génération article : {e}")
         return None, None
 
-# ✅ Enregistrement dans storage/app/public/posts
-def generate_image(prompt, filename):
-    try:
-        print(f"🖼️ Génération image : {filename}")
-        response = client.images.generate(
-            model="dall-e-3",
-            prompt=prompt,
-            n=1,
-            size="1024x1024"
-        )
-        url = response.data[0].url
-        img_bytes = requests.get(url).content
-
-        # Chemin Laravel attendu
-        storage_dir = Path("storage/app/public/posts")
-        storage_dir.mkdir(parents=True, exist_ok=True)
-        filepath = storage_dir / filename
-
-        with open(filepath, "wb") as f:
-            f.write(img_bytes)
-
-        return str(filepath)
-    except Exception as e:
-        print(f"❌ Erreur lors de la génération d'image : {e}")
-        return None
-
-# 📤 Envoie à Laravel via API
-def send_to_laravel(title, content, keyword, category_id, cover_path, thumb_path):
+# 📤 Envoie l'article à Laravel
+def send_to_laravel(title, content, keyword):
     print(f"📤 Envoi à Laravel : {title}")
     try:
-        with open(cover_path, "rb") as cover_file, open(thumb_path, "rb") as thumb_file:
-            files = {
-                "cover_image": cover_file,
-                "thumbnail_image": thumb_file
-            }
-            data = {
-                "title": title,
-                "content": content,
-                "key_words": keyword,
-                "category_id": category_id
-            }
-            headers = {
-                "Accept": "application/json",
-                "User-Agent": "SEOArticleBot/1.0"
-            }
+        image_path = "storage/photos/1/Google I/Google IO 2025.png"
+        data = {
+            "title": title,
+            "content": content,
+            "key_words": keyword,
+            "cover_image": image_path,
+            "thumbnail_image": image_path
+        }
 
-            response = requests.post(LARAVEL_API, files=files, data=data, headers=headers, timeout=30)
-            response.raise_for_status()
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": "SEOArticleBot/1.0"
+        }
 
-            content_type = response.headers.get("Content-Type", "")
-            if "application/json" in content_type:
-                print("✅ Réponse Laravel :", response.json())
-            else:
-                print("⚠️ Réponse non-JSON Laravel :")
-                print(response.text[:1000])
+        response = requests.post(LARAVEL_API, data=data, headers=headers, timeout=30)
+        response.raise_for_status()
+
+        if "application/json" in response.headers.get("Content-Type", ""):
+            json_response = response.json()
+            print("✅ Réponse Laravel :", json_response)
+            return True, json_response.get("post_id")
+        else:
+            print("⚠️ Réponse non-JSON :", response.text[:1000])
+            return False, None
 
     except requests.exceptions.HTTPError as e:
         print("❌ Erreur HTTP Laravel :", e.response.status_code, e.response.text[:500])
+        return False, None
     except Exception as e:
-        print("❌ Erreur générale lors de l’envoi à Laravel :", str(e))
+        print("❌ Erreur d’envoi à Laravel :", str(e))
+        return False, None
 
-# ▶️ Lancement du script
+# ▶️ Script principal
 def main():
+    excel_file = "keywords.xlsx"
     try:
-        df = pd.read_excel("keywords.xlsx")
+        df = pd.read_excel(excel_file, engine='openpyxl')
     except Exception as e:
-        print("❌ Fichier keywords.xlsx introuvable ou illisible :", e)
+        print("❌ Fichier Excel illisible :", e)
         return
 
-    for _, row in df.head(10).iterrows():
+    # Ajoute les colonnes si absentes
+    if 'envoye' not in df.columns:
+        df['envoye'] = 0
+    if 'post_id' not in df.columns:
+        df['post_id'] = None
+
+    for idx, row in df.iterrows():
+        if row.get("envoye", 0) == 1:
+            continue  # déjà envoyé
+
         keyword = str(row.get("mot_cle", "")).strip()
-        category = str(row.get("catégorie", "")).strip()
-
-        if not keyword or not category:
-            print("⚠️ Mot-clé ou catégorie manquant. Article ignoré.")
+        if not keyword:
+            print("⚠️ Mot-clé manquant. Ignoré.")
             continue
-
-        category_id = categorie_to_id(category)
 
         title, content = generate_article(keyword)
         if not title or not content:
-            print("⚠️ Article non généré. Passage au suivant.")
+            print("⚠️ Article non généré.")
             continue
 
-        slug = re.sub(r'\W+', '_', keyword.lower())
-        cover_img = generate_image(f"Image réaliste pour : {keyword}", f"{slug}_cover.jpg")
-        thumb_img = generate_image(f"Miniature réaliste pour : {keyword}", f"{slug}_thumb.jpg")
+        success, post_id = send_to_laravel(title, content, keyword)
+        if success:
+            df.at[idx, 'envoye'] = 1
+            df.at[idx, 'post_id'] = post_id
+            print("✅ Article envoyé et post_id enregistré.\n")
+        else:
+            print("❌ Échec d'envoi.\n")
 
-        if not cover_img or not thumb_img:
-            print("⚠️ Images manquantes. Article ignoré.")
-            continue
-
-        send_to_laravel(title, content, keyword, category_id, cover_img, thumb_img)
-
-        # Nettoyage facultatif si besoin
-        # os.remove(cover_img)
-        # os.remove(thumb_img)
+    # Enregistre les modifications dans le fichier Excel
+    try:
+        df.to_excel(excel_file, index=False, engine='openpyxl')
+        print("💾 Fichier Excel mis à jour avec les post_id.")
+    except Exception as e:
+        print("❌ Erreur lors de la sauvegarde du fichier :", e)
 
 if __name__ == "__main__":
     main()
