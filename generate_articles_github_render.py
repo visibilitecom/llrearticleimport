@@ -9,6 +9,7 @@ from flask import Flask
 from bs4 import BeautifulSoup
 import markdown
 from openai import OpenAI
+from threading import Thread
 
 # 📦 Vérifie et installe les modules nécessaires
 required = ['openai', 'markdown', 'bs4', 'openpyxl', 'flask', 'python-dotenv']
@@ -63,7 +64,6 @@ Ta mission : rédiger un article HTML de **plus de 1000 mots** (au moins 6000 ca
 - Écris pour une intention de recherche **informationnelle**
 - Ne crée pas de tableau HTML
 - Génére uniquement le contenu HTML (pas de <html>, <head>, <body>)"""
-   
     try:
         response = client.chat.completions.create(
             model="gpt-4",
@@ -176,8 +176,14 @@ app = Flask(__name__)
 
 @app.route('/')
 def index():
-    return "Le bot fonctionne."
+    return "✅ Le bot fonctionne, Flask est actif."
+
+def run_main():
+    try:
+        main()
+    except Exception as e:
+        print("❌ Erreur dans main() :", e)
 
 if __name__ == '__main__':
-    main()
+    Thread(target=run_main).start()
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
