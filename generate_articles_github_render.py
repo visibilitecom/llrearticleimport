@@ -5,18 +5,18 @@ import subprocess
 import requests
 import pandas as pd
 from dotenv import load_dotenv
+from flask import Flask
+from bs4 import BeautifulSoup
+import markdown
+from openai import OpenAI
 
 # 📦 Vérifie et installe les modules nécessaires
-required = ['openai', 'markdown', 'bs4', 'openpyxl']
+required = ['openai', 'markdown', 'bs4', 'openpyxl', 'flask', 'python-dotenv']
 for pkg in required:
     try:
         __import__(pkg)
     except ImportError:
         subprocess.check_call([sys.executable, "-m", "pip", "install", pkg])
-
-import markdown
-from bs4 import BeautifulSoup
-from openai import OpenAI
 
 # 🔐 Chargement des variables
 load_dotenv()
@@ -27,7 +27,7 @@ IMAGE_PATH = "storage/photos/1/Google I/Google IO 2025.png"
 # 🧠 Génération d'article long et SEO
 def generate_article(keyword):
     print(f"🧠 Génération de contenu pour : {keyword}")
-    prompt = f"""Tu es un rédacteur web senior, expert en SEO et UX, spécialisé dans la rédaction d’articles optimisés pour Google et agréables à lire.
+   prompt = f"""Tu es un rédacteur web senior, expert en SEO et UX, spécialisé dans la rédaction d’articles optimisés pour Google et agréables à lire.
 
 Ta mission : rédiger un article HTML de **plus de 1000 mots** (au moins 6000 caractères), sur le sujet suivant : **{keyword}**.
 
@@ -63,6 +63,7 @@ Ta mission : rédiger un article HTML de **plus de 1000 mots** (au moins 6000 ca
 - Écris pour une intention de recherche **informationnelle**
 - Ne crée pas de tableau HTML
 - Génére uniquement le contenu HTML (pas de <html>, <head>, <body>)"""
+
     try:
         response = client.chat.completions.create(
             model="gpt-4",
@@ -81,13 +82,13 @@ Ta mission : rédiger un article HTML de **plus de 1000 mots** (au moins 6000 ca
         print(f"❌ Erreur GPT : {e}")
         return None, None
 
-# 🔎 Extraction du premier H2 pour titre
+# 🔎 Extraction du premier H2
 def extract_title_from_html(html):
     soup = BeautifulSoup(html, 'html.parser')
     h2 = soup.find('h2')
     return h2.get_text(strip=True) if h2 else "Article sans titre"
 
-# 🧼 Nettoyage HTML (compatible Laravel/Tiny)
+# 🧼 Nettoyage HTML
 def sanitize_html(html):
     soup = BeautifulSoup(html, 'html.parser')
     for tag in soup.find_all(['h2', 'h3']):
@@ -99,7 +100,7 @@ def sanitize_html(html):
         tag.append(em)
     return str(soup)
 
-# 📤 Envoi à Laravel
+# 📤 Envoi Laravel
 def send_to_laravel(title, content, keyword):
     print(f"📤 Envoi à Laravel : {title}")
     try:
@@ -170,5 +171,13 @@ def main():
 
     print("✅ Script terminé avec succès.")
 
-if __name__ == "__main__":
+# 🚀 Lancement Flask pour Render
+app = Flask(__name__)
+
+@app.route('/')
+def index():
+    return "Le bot fonctionne."
+
+if __name__ == '__main__':
     main()
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
