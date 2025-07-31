@@ -1,4 +1,3 @@
-
 import os
 import re
 import sys
@@ -27,7 +26,7 @@ IMAGE_PATH = "storage/photos/1/Google I/Google IO 2025.png"
 
 # 🧠 Génération d'article long et SEO
 def generate_article(keyword):
-    print(f"🧠 Génération de contenu : {keyword}")
+    print(f"🧠 Génération de contenu pour : {keyword}")
     prompt = f"""Tu es un rédacteur web senior, expert en SEO et UX, spécialisé dans la rédaction d’articles optimisés pour Google et agréables à lire.
 
 Ta mission : rédiger un article HTML de **plus de 1000 mots** (au moins 6000 caractères), sur le sujet suivant : **{keyword}**.
@@ -148,20 +147,30 @@ def main():
             continue
 
         title, content = generate_article(keyword)
-        if not title or not content:
+        if not title or not content or len(content) < 6000:
+            print(f"⚠️ Contenu insuffisant pour : {keyword} ({len(content) if content else 0} caractères)")
             continue
 
         success, post_id = send_to_laravel(title, content, keyword)
         if success:
             df.at[idx, 'envoye'] = 1
             df.at[idx, 'post_id'] = post_id
-            print("✅ Article publié.\n")
+            print("✅ Article publié.
+")
+        else:
+            backup_path = f"article_backup_{keyword.replace(' ', '_')}.html"
+            with open(backup_path, "w", encoding="utf-8") as f:
+                f.write(content)
+            print(f"💾 Article sauvegardé localement dans {backup_path}
+")
 
     try:
         df.to_excel("keywords.xlsx", index=False, engine='openpyxl')
-        print("💾 Excel mis à jour.")
+        print("💾 Fichier Excel mis à jour.")
     except Exception as e:
         print("❌ Erreur sauvegarde Excel :", e)
+
+    print("✅ Script terminé avec succès.")
 
 if __name__ == "__main__":
     main()
