@@ -27,7 +27,7 @@ IMAGE_PATH = "storage/photos/1/Google I/Google IO 2025.png"
 # 🧠 Génération d'article long et SEO
 def generate_article(keyword):
     print(f"🧠 Génération de contenu pour : {keyword}")
-   prompt = f"""Tu es un rédacteur web senior, expert en SEO et UX, spécialisé dans la rédaction d’articles optimisés pour Google et agréables à lire.
+    prompt = f"""Tu es un rédacteur web senior, expert en SEO et UX, spécialisé dans la rédaction d’articles optimisés pour Google et agréables à lire.
 
 Ta mission : rédiger un article HTML de **plus de 1000 mots** (au moins 6000 caractères), sur le sujet suivant : **{keyword}**.
 
@@ -63,7 +63,7 @@ Ta mission : rédiger un article HTML de **plus de 1000 mots** (au moins 6000 ca
 - Écris pour une intention de recherche **informationnelle**
 - Ne crée pas de tableau HTML
 - Génére uniquement le contenu HTML (pas de <html>, <head>, <body>)"""
-
+   
     try:
         response = client.chat.completions.create(
             model="gpt-4",
