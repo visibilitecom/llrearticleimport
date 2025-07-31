@@ -24,60 +24,40 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 LARAVEL_API = os.getenv("LARAVEL_API")
 IMAGE_PATH = "storage/photos/1/Google I/Google IO 2025.png"
 
+# 🧠 Génération d'article long et SEO
 def generate_article(keyword):
-    print(f"🧠 Génération de contenu pour : {keyword}")
-
+    print(f"🧠 Génération de contenu : {keyword}")
     prompt = f"""
-Tu es un rédacteur web senior, expert en SEO et UX. Ton objectif est de rédiger un article HTML **de plus de 1000 mots** (au moins 6000 caractères) sur le sujet suivant : **{keyword}**.
+Tu es un expert en rédaction humaine et SEO.
 
-### Structure HTML attendue :
-- Un **titre SEO principal** (sert de <title>, **pas de balise <h1>**) :
-    - Doit inclure le mot-clé
-    - Ne pas dépasser 65 caractères
-    - Être incitatif au clic : “Comment…”, “Top 10…”, “Pourquoi…”…
-- Une **balise meta-description** (max 160 caractères) contenant le mot-clé
-- L’article contient **au moins 7 sections H2** sous forme :
-    `<h2 class="section__title"><em>...</em></h2>`
-- Utilise des **sous-sections H3** si besoin :
-    `<h3 class="section__title"><em>...</em></h3>`
-- Ajoute des listes si pertinent : `<ul><li>...</li></ul>`
-- Utilise des paragraphes courts et lisibles : `<p>...</p>`
+Rédige un article de blog HTML **de plus de 1000 mots** (au moins 6000 caractères), sans titre "Introduction". 
+Structure : 
+- 1 titre principal (utilisé comme <title>)
+- **7 sections H2** minimum : <h2 class="section__title"><em>...</em></h2>
+- Des sous-sections en <h3 class="section__title"><em>...</em></h3> si besoin
+- Des <ul><li>...</li></ul> si pertinent
+- Des <p> courts, lisibles, optimisés pour le web
 
-### Contraintes SEO :
-- Le mot-clé principal doit apparaître :
-    - dans au moins un H2
-    - dans deux paragraphes
-    - dans une liste
-    - dans la meta-description
-- Densité naturelle (~1–2 %) sans suroptimisation
-- Inclure des expressions longue traîne et synonymes
-- Évite les titres "Introduction" ou "Conclusion"
-- N’introduis pas par “Dans cet article…”
-- N’évoque jamais l’utilisation d’IA
-- Adopte un **style fluide, professionnel et convaincant**
-- Mets en avant les bénéfices concrets pour le lecteur
-- Intention de recherche **informationnelle**
-- Ne génère que le contenu HTML (pas de `<html>`, `<body>`, etc.)
-"""
-
+Sujet : {keyword}
+    """
     try:
         response = client.chat.completions.create(
             model="gpt-4",
             messages=[
-                {"role": "system", "content": "Tu écris comme un expert SEO humain."},
+                {"role": "system", "content": "Tu écris comme un rédacteur humain SEO confirmé."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.75,
-            max_tokens=2500  # ou ajuste selon ton quota
+            temperature=0.7,
+            max_tokens=2500
         )
         html = response.choices[0].message.content
         title = extract_title_from_html(html)
         clean_html = sanitize_html(html)
-        print(f"✅ Article généré pour '{keyword}' — Titre : {title}")
         return title, clean_html
     except Exception as e:
-        print(f"❌ Erreur lors de la génération avec OpenAI : {e}")
+        print(f"❌ Erreur GPT : {e}")
         return None, None
+
 # 🔎 Extraction du premier H2 pour titre
 def extract_title_from_html(html):
     soup = BeautifulSoup(html, 'html.parser')
