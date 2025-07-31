@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import os
 import re
 import sys
@@ -5,11 +7,9 @@ import subprocess
 import requests
 import pandas as pd
 from dotenv import load_dotenv
-from flask import Flask
 from bs4 import BeautifulSoup
 import markdown
 from openai import OpenAI
-from threading import Thread
 
 # 📦 Vérifie et installe les modules nécessaires
 required = ['openai', 'markdown', 'bs4', 'openpyxl', 'flask', 'python-dotenv']
@@ -20,6 +20,7 @@ for pkg in required:
         subprocess.check_call([sys.executable, "-m", "pip", "install", pkg])
 
 # 🔐 Chargement des variables
+df_path = "keywords.xlsx"
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 LARAVEL_API = os.getenv("LARAVEL_API")
@@ -39,9 +40,9 @@ Ta mission : rédiger un article HTML de **plus de 1000 mots** (au moins 6000 ca
     - Doit inciter au clic (ex. : “Comment…”, “Top 10…”, “Pourquoi…”)
 - Ajoute une **balise meta-description HTML** (<160 caractères) contenant le mot-clé principal
 - Structure l’article avec **au moins 7 sections H2** :
-  <h2 class="section__title"><em>...</em></h2>
+  <h2 class=\"section__title\"><em>...</em></h2>
 - Ajoute des sous-sections H3 si nécessaire :
-  <h3 class="section__title"><em>...</em></h3>
+  <h3 class=\"section__title\"><em>...</em></h3>
 - Utilise des listes <ul><li>...</li></ul> si pertinent
 - Utilise des paragraphes courts (<p>) optimisés pour la lecture web
 
@@ -63,7 +64,7 @@ Ta mission : rédiger un article HTML de **plus de 1000 mots** (au moins 6000 ca
 
 - Écris pour une intention de recherche **informationnelle**
 - Ne crée pas de tableau HTML
-- Génére uniquement le contenu HTML (pas de <html>, <head>, <body>)"""
+- Génère uniquement le contenu HTML (pas de <html>, <head>, <body>)"""
     try:
         response = client.chat.completions.create(
             model="gpt-4",
@@ -100,9 +101,9 @@ def sanitize_html(html):
         tag.append(em)
     return str(soup)
 
-# 📤 Envoi Laravel
+# 📄 Envoi Laravel
 def send_to_laravel(title, content, keyword):
-    print(f"📤 Envoi à Laravel : {title}")
+    print(f"📄 Envoi à Laravel : {title}")
     try:
         data = {
             "title": title,
@@ -129,7 +130,7 @@ def send_to_laravel(title, content, keyword):
 # ▶️ Script principal
 def main():
     try:
-        df = pd.read_excel("keywords.xlsx", engine='openpyxl')
+        df = pd.read_excel(df_path, engine='openpyxl')
     except Exception as e:
         print("❌ Erreur lecture Excel :", e)
         return
@@ -164,26 +165,12 @@ def main():
             print(f"💾 Article sauvegardé localement dans {backup_path}")
 
     try:
-        df.to_excel("keywords.xlsx", index=False, engine='openpyxl')
+        df.to_excel(df_path, index=False, engine='openpyxl')
         print("💾 Fichier Excel mis à jour.")
     except Exception as e:
         print("❌ Erreur sauvegarde Excel :", e)
 
     print("✅ Script terminé avec succès.")
 
-# 🚀 Lancement Flask pour Render
-app = Flask(__name__)
-
-@app.route('/')
-def index():
-    return "✅ Le bot fonctionne, Flask est actif."
-
-def run_main():
-    try:
-        main()
-    except Exception as e:
-        print("❌ Erreur dans main() :", e)
-
 if __name__ == '__main__':
-    Thread(target=run_main).start()
-    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
+    main()
