@@ -155,7 +155,7 @@ def main():
         if success:
             df.at[idx, 'envoye'] = 1
             df.at[idx, 'post_id'] = post_id
-            print("✅ Article publié.
+            print("✅ Article publié.")
 ")
         else:
             backup_path = f"article_backup_{keyword.replace(' ', '_')}.html"
