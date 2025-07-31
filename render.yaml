@@ -1,9 +1,0 @@
-services:
-  - type: cron
-    name: generation-articles-seo
-    runtime: python
-    repo: https://github.com/visibilitecom/llrearticleimport
-    branch: main
-    schedule: "@daily"
-    buildCommand: pip install -r requirements.txt
-    startCommand: python generate_articles_github_render.py
